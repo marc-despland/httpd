@@ -13,18 +13,22 @@
 
 
 
-HttpServer::HttpServer(int port, unsigned int size, bool keepalive):Runnable() {
+int HttpServer::response404Callback(HttpRequest * request, HttpResponse * response) {
+	Log::logger->log("CNXTCP", DEBUG) << "Entering default callback" <<endl;
+	response->setStatusCode(404);
+	response->setStatusMessage("NOT FOUND");
+	response->send();
+}
+
+HttpServer::HttpServer(int port, unsigned int size):Runnable() {
 	this->port=port;
 	this->size=size;
 	this->count=0;
-	this->wait=false;
-	this->keepalive=keepalive;
+	this->default_callback=HttpServer::response404Callback;
+	this->requests=new std::map<int,HttpRequestParser *>();
+	this->handlers=new std::map<int,std::vector<HttpHandler *> *>();
 }
 
-
-void HttpServer::waitBeforeClosing() {
-	this->wait=true;
-}
 
 void HttpServer::makeSocketNonBlocking(int socket) throw(MakeSocketNonBlockingException){
 	int flags, s;
@@ -85,7 +89,12 @@ void HttpServer::accept() throw(MakeSocketNonBlockingException) {
 			if (clientfd>=0) {
 				HttpServer::makeSocketNonBlocking(clientfd);
 				this->pool->add(clientfd);
-				this->requests[clientfd].init();
+				Log::logger->log("CNXTCP",DEBUG) << "add client in pool" << clientfd <<endl;
+				HttpRequestParser * parser=new HttpRequestParser(clientfd, this);
+				Log::logger->log("CNXTCP",DEBUG) << "new parser" << clientfd <<endl;
+				this->requests->insert( std::pair<int,HttpRequestParser *>(clientfd,parser) );
+				//Log::logger->log("CNXTCP",DEBUG) << "try to init parser" << clientfd <<endl;
+				//this->requests[clientfd]->init(clientfd, this);
 				this->count++;
 				Log::logger->log("CNXTCP", DEBUG) << "New Connection " << this->count <<endl;
 			} else {
@@ -99,6 +108,41 @@ void HttpServer::accept() throw(MakeSocketNonBlockingException) {
 	}
 }
 
+void HttpServer::process(HttpRequest * request, HttpResponse * response) {
+	bool found=false;
+	unsigned int i=0;
+	try {
+		std::vector<HttpHandler *> * urls=this->handlers->at(request->getMethod());
+		while (!found && (i<urls->size())) {
+			found=(*urls)[i]->match(request->getUrl());
+			if (!found) i++;
+		}
+		if (found) {
+			(*urls)[i]->process(request);
+		} else {
+			this->default_callback(request, response);
+		}
+	} catch(std::out_of_range &e) {
+			this->default_callback(request, response);		
+	}
+
+}
+
+void HttpServer::setDefaultCallback(http_callback callback) {
+	this->default_callback=callback;
+}
+
+void HttpServer::add(unsigned int method, string url, http_callback callback) {
+	HttpHandler * handler=new HttpHandler(url, callback);
+	std::vector<HttpHandler *> * urls=NULL;
+	try {
+		urls=this->handlers->at(method);
+	} catch(std::out_of_range &e) {
+		urls = new std::vector<HttpHandler *>();
+		this->handlers->insert( std::pair<int,std::vector<HttpHandler *> *>(method,urls) );
+	}
+	urls->push_back(handler);
+}
 
 
 void HttpServer::run() {
@@ -120,39 +164,16 @@ void HttpServer::run() {
 	                Log::logger->log("CNXTCP",DEBUG) << "Trying to read in socket "<< ready->at(i)<<endl;
 	                nbb = read (ready->at(i),  buf, sizeof buf);
 	               	readerror=errno;
-	                /*if ((nbb<0) && (readerror==EBADF)) {
-	                	this->requests.erase(ready->at(i));
-	                	::close(ready->at(i));
-	                	Log::logger->log("CNXTCP",DEBUG) << "Closing socket "<< ready->at(i)<<endl;
-	                } */
 	                if (nbb>0) {
 	                	Log::logger->log("CNXTCP",DEBUG) << "Socket is a client one with something to read "<<  ready->at(i) << " => " <<nbb << " bytes"<<endl;
-	                	if (this->requests[ready->at(i)].finished(buf,nbb)) {
-	                		Log::logger->log("CNXTCP",DEBUG) << "Have read full request "<<  ready->at(i) <<endl;
-	                		time_t rawtime;
-	  						struct tm * timeinfo;
-	  						char buffer [80]; 
-	  						time (&rawtime);
-	  						timeinfo = localtime (&rawtime);
-	  						strftime (buffer,80,"Date: %a, %d %b %Y %X %Z",timeinfo);
-	  						std::string response= "HTTP/1.1 200 OK\r\n"+ string(buffer) +"\r\nServer: fast\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: 13\r\n\r\n{ 'event':0 }";
-	  						if (this->keepalive) {
-	  							response= "HTTP/1.1 200 OK\r\n"+ string(buffer) +"\r\nServer: fast\r\nContent-Type: application/json\r\nConnection: keep-alive\r\nContent-Length: 13\r\n\r\n{ 'event':0 }";
-	  						}
-	  						int ws=write(ready->at(i), response.c_str(), response.length());
-	                		if (ws<0) {
-	                			Log::logger->log("CNXTCP",ERROR) << "Can't write on socket: " << ready->at(i) <<endl;
-	                		}
-	                		if (ws != response.length()) Log::logger->log("CNXTCP",ERROR) << "We still have to write data " << ready->at(i) <<endl;
-	                		//::shutdown(ready->at(i), SHUT_RD);
-	                		
-	                		if (this->wait) sleep(2);
-	                		if (!this->keepalive) {
-	                			Log::logger->log("CNXTCP",DEBUG) << "Closing socket "<<  ready->at(i) <<endl;
-	                			::close(ready->at(i));
-	                			this->requests[ready->at(i)].init();
-	                		}
-	                	}	
+	                	bool finished=(*this->requests)[ready->at(i)]->received(buf, nbb);
+	                	if (finished) {
+	                		Log::logger->log("CNXTCP",DEBUG) << "End receiving request" <<endl;
+	                		HttpRequestParser * parser=(*this->requests)[ready->at(i)];
+	                		this->requests->erase(ready->at(i));
+	                		delete parser;
+
+	                	}
 	                }
 	                Log::logger->log("CNXTCP",DEBUG) << "Read loop "<< readerror<<endl;
 	            } while (readerror==0);

@@ -6,7 +6,10 @@ using namespace std;
 #include "runnable.h"
 #include "connectionpool.h"
 #include <map>
-#include "httprequest.h"
+#include <vector>
+#include "httprequestparser.h"
+#include "httphandler.h"
+#include "ihttprequestprocessor.h"
 
 class MakeSocketNonBlockingException: public exception {
 	public:
@@ -60,26 +63,28 @@ class CantConnectException: public exception {
 };
 
 
-
-class HttpServer:Runnable {
+class HttpServer:Runnable, IHttpRequestProcessor {
 
 public:
-	HttpServer(int port, unsigned int size, bool keepalive);
+	HttpServer(int port, unsigned int size);
 	void listen() throw (ConnectionListenException);
 	void accept() throw (MakeSocketNonBlockingException);
 	void run();
-	void waitBeforeClosing();
+	void process(HttpRequest * request, HttpResponse * response);
+	void add(unsigned int method, string url, http_callback callback);
+	void setDefaultCallback(http_callback callback);
 
 protected:
-	bool	keepalive;
 	static void makeSocketNonBlocking(int socket) throw(MakeSocketNonBlockingException);
-	bool wait;
 	int socketfd;
 	int port;
 	unsigned int size;	
 	ConnectionPool * pool;
 	unsigned int count;	
-	std::map<int,HttpRequest> requests;
+	std::map<int,HttpRequestParser *> * requests;
+	std::map<int,std::vector<HttpHandler *> *> * handlers;
+	http_callback default_callback;
+	static int response404Callback(HttpRequest * request, HttpResponse * response);
 
 };
 

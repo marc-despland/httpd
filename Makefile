@@ -4,7 +4,7 @@ CC    = g++
 CPPFLAGS       = -g -Wall -Iinclude -std=c++11
 OLDFLAGS	= -std=c++11
 CFLAGS       = $(CPPFLAGS) 
-LDLIBS		 = -lutil -lpthread -lstdc++
+LDLIBS		 = -lutil -lpthread -lstdc++ -lhttp_parser
 TARGET  = httpd
 SOURCES = $(shell echo src/*.cpp)
 HEADERS = $(shell echo include/*.h)
