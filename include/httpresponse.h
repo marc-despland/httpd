@@ -9,6 +9,7 @@ using namespace std;
 class HttpResponse {
 	public:
 		HttpResponse(int socket);
+		~HttpResponse();
 		void setContentType(string value);
 		void setStatusCode(unsigned int value);
 		void setStatusMessage(string message);

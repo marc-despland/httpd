@@ -8,8 +8,7 @@ HttpHandler::HttpHandler(string url, http_callback callback) {
 }
 
 
-int HttpHandler::process(HttpRequest * request) {
-	HttpResponse * response=new HttpResponse(request->getSocket());
+int HttpHandler::process(HttpRequest * request,HttpResponse * response) {
 	return this->callback(request, response);
 }
 

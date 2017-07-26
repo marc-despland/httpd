@@ -16,7 +16,7 @@ class HttpHandler{
 	public:
 		HttpHandler(string url, http_callback callback);
 		bool match(string url);
-		int process(HttpRequest * req);
+		int process(HttpRequest * req,HttpResponse * res);
 	protected:
 		std::regex regex_url;
 		http_callback callback;

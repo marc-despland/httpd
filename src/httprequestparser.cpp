@@ -40,8 +40,6 @@ HttpRequestParser::HttpRequestParser(int socket, IHttpRequestProcessor * hrp) {
 }
 
 HttpRequestParser::~HttpRequestParser() {
-	delete this->request;
-	delete this->response;
 	free(this->settings);
 	free(this->parser);
 }

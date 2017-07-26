@@ -23,6 +23,7 @@ void ConnectionPool::add(int socket) throw (ConnectionPoolException){
 	this->cntxMap.insert(pair<int, int>(socket, pos));
 	//this->safe.unlock();
 	struct epoll_event event;
+	memset(&event, 0, sizeof(event));
 	event.data.fd = socket;
   	event.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
   	int s = epoll_ctl (this->pool, EPOLL_CTL_ADD, socket, &event);

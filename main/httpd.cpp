@@ -5,6 +5,7 @@
 #include "httpserver.h"
 
 
+
 int responseTest(HttpRequest * request, HttpResponse * response) {
 	Log::logger->log("CNXTCP", DEBUG) << "Entering test callback" <<endl;
 	string body="This is a test";
@@ -14,14 +15,15 @@ int responseTest(HttpRequest * request, HttpResponse * response) {
 	response->setBody(buffer, body.length());
 	response->send();
 	delete[] buffer;
-
+	delete response;
+	delete request;
 }
 
 
 
 int main(int argc, char **argv) {
 	Log::logger->setLevel(NOTICE);
-	Options options(argv[0], "1.0.0", "Epoll Ping Pong https://github.com/marc-despland/httpd");
+	Options options(argv[0], "1.0.0", "Httpd Test Server https://github.com/marc-despland/httpd");
 	try {
 		options.add('d', "debug", "Start on debug mode", false, false);
 		options.add('p', "port", "Port to listen to", true, true);
@@ -30,8 +32,8 @@ int main(int argc, char **argv) {
 	try {
 		options.parse(argc, argv);
 		if (options.get('d')->isAssign()) Log::logger->setLevel(DEBUG);
-		HttpServer * server=new HttpServer(options.get("port")->asInt(),20);
-		server->add(HTTP_GET, "\\/marc\\/mde", responseTest);
+		HttpServer * server=new HttpServer(options.get("port")->asInt(),20, true);
+		server->add(HTTP_GET, "/marc/mde", responseTest);
 		server->run();
 		
 	} catch (OptionsStopException &e) {

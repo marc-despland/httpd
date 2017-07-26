@@ -3,6 +3,9 @@
 #include <unistd.h>
 #include "log.h"
 
+
+//144
+
 HttpResponse::HttpResponse(int socket) {
 	this->socket=socket;
 	this->contentType="text/plain";
@@ -11,6 +14,10 @@ HttpResponse::HttpResponse(int socket) {
 	this->contentLength=0;
 	this->buffer=NULL;
 }
+
+HttpResponse::~HttpResponse() {
+}
+
 
 void HttpResponse::setContentType(string value) {
 	this->contentType=value;
@@ -33,16 +40,19 @@ void HttpResponse::setBody(char *buffer, unsigned long size) {
 void HttpResponse::send() {
 	time_t rawtime;
 	struct tm * timeinfo;
-	char buffer [80]; 
+	char responsedate [80]; 
 	time (&rawtime);
 	timeinfo = localtime (&rawtime);
-	strftime (buffer,80,"Date: %a, %d %b %Y %X %Z",timeinfo);
+	strftime (responsedate,80,"Date: %a, %d %b %Y %X %Z",timeinfo);
 
 	std::stringstream headers;
 	headers << "HTTP/1.1 "<<this->statusCode<< " " <<this->statusMessage<<"\r\n";
 	headers << "Content-Type: "<<this->contentType<<"\r\n";
 	headers << "Content-Length: "<<this->contentLength<<"\r\n";
-	headers << buffer<<"\r\n";
+	headers << responsedate<<"\r\n";
+	for (std::map<std::string,std::string>::iterator it=this->headers.begin(); it!=this->headers.end(); ++it) {
+    	headers << it->first << ": " << it->second << "\r\n";
+    }
 	headers << "\r\n";
 	int ws=write(this->socket, headers.str().c_str(), headers.str().length());
 	if (ws<0) {

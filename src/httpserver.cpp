@@ -10,6 +10,7 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <http_parser.h>
 
 
 
@@ -18,15 +19,34 @@ int HttpServer::response404Callback(HttpRequest * request, HttpResponse * respon
 	response->setStatusCode(404);
 	response->setStatusMessage("NOT FOUND");
 	response->send();
+	delete response;
+	delete request;
 }
 
-HttpServer::HttpServer(int port, unsigned int size):Runnable() {
+int HttpServer::responseCorsCallback(HttpRequest * request, HttpResponse * response) {
+	Log::logger->log("CNXTCP", DEBUG) << "Entering Cors callback" <<endl;
+	response->setStatusCode(204);
+	response->setStatusMessage("NO CONTENT");
+	response->addCustomHeader("Access-Control-Allow-Origin","*");
+	response->addCustomHeader("Access-Control-Allow-Methods","GET,HEAD,PUT,PATCH,POST,DELETE");
+	//response->addCustomHeader("Access-Control-Allow-Credentials","*");
+	//response->addCustomHeader("Access-Control-Allow-Headers","*");
+	response->send();
+	delete response;
+	delete request;
+}
+
+
+HttpServer::HttpServer(int port, unsigned int size, bool cors):Runnable() {
 	this->port=port;
 	this->size=size;
 	this->count=0;
 	this->default_callback=HttpServer::response404Callback;
 	this->requests=new std::map<int,HttpRequestParser *>();
 	this->handlers=new std::map<int,std::vector<HttpHandler *> *>();
+	if (cors) {
+		this->add(HTTP_OPTIONS, ".*", HttpServer::responseCorsCallback);
+	}
 }
 
 
@@ -118,7 +138,7 @@ void HttpServer::process(HttpRequest * request, HttpResponse * response) {
 			if (!found) i++;
 		}
 		if (found) {
-			(*urls)[i]->process(request);
+			(*urls)[i]->process(request, response);
 		} else {
 			this->default_callback(request, response);
 		}
@@ -179,6 +199,7 @@ void HttpServer::run() {
 	            } while (readerror==0);
 			}
 		}
+		delete ready;
 	}
 
 }

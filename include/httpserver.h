@@ -66,13 +66,14 @@ class CantConnectException: public exception {
 class HttpServer:Runnable, IHttpRequestProcessor {
 
 public:
-	HttpServer(int port, unsigned int size);
+	HttpServer(int port, unsigned int size, bool cors);
 	void listen() throw (ConnectionListenException);
 	void accept() throw (MakeSocketNonBlockingException);
 	void run();
 	void process(HttpRequest * request, HttpResponse * response);
 	void add(unsigned int method, string url, http_callback callback);
 	void setDefaultCallback(http_callback callback);
+
 
 protected:
 	static void makeSocketNonBlocking(int socket) throw(MakeSocketNonBlockingException);
@@ -85,6 +86,7 @@ protected:
 	std::map<int,std::vector<HttpHandler *> *> * handlers;
 	http_callback default_callback;
 	static int response404Callback(HttpRequest * request, HttpResponse * response);
+	static int responseCorsCallback(HttpRequest * request, HttpResponse * response);
 
 };
 
